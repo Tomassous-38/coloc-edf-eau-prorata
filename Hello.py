@@ -3,6 +3,11 @@ from datetime import datetime
 
 if 'current_step' not in st.session_state:
     st.session_state.current_step = 0
+    st.session_state.eau_amount = 0.0
+    st.session_state.edf_amount = 0.0
+    st.session_state.coloc_details = {}
+    st.session_state.payers = {}
+    st.session_state.bill_details = {}
 
 def calculate_days(start_date, end_date):
     delta = end_date - start_date
@@ -53,11 +58,11 @@ current_step = st.sidebar.radio("Choisir une étape", steps, index=current_step)
 
 if current_step == "Montant des Factures":
     st.header("Étape 1: Montant des Factures")
-    eau_amount = st.number_input("Montant de la Facture d'Eau", min_value=0.0, format="%.2f")
+    eau_amount = st.number_input("Montant de la Facture d'Eau", min_value=0.0, format="%.2f", value=st.session_state.eau_amount)
     eau_start_date = st.date_input("Date de Début de Facturation Eau")
     eau_end_date = st.date_input("Date de Fin de Facturation Eau")
 
-    edf_amount = st.number_input("Montant de la Facture EDF", min_value=0.0, format="%.2f")
+    edf_amount = st.number_input("Montant de la Facture EDF", min_value=0.0, format="%.2f", value=st.session_state.edf_amount)
     edf_start_date = st.date_input("Date de Début de Facturation EDF")
     edf_end_date = st.date_input("Date de Fin de Facturation EDF")
 
@@ -67,22 +72,24 @@ if current_step == "Montant des Factures":
             st.session_state.bill_details["Eau"] = {"amount": eau_amount, "start_date": eau_start_date, "end_date": eau_end_date}
         if edf_amount > 0:
             st.session_state.bill_details["EDF"] = {"amount": edf_amount, "start_date": edf_start_date, "end_date": edf_end_date}
+        st.session_state.eau_amount = eau_amount
+        st.session_state.edf_amount = edf_amount
         st.session_state.current_step = 1
 
 elif current_step == "Détails des Colocataires":
     st.header("Étape 2: Détails des Colocataires")
     coloc_count = st.number_input("Nombre de Colocataires", min_value=1, value=4)
-    coloc_details = {}
+    coloc_details = st.session_state.coloc_details
 
     for i in range(1, coloc_count + 1):
-        name = st.text_input(f"Nom du Colocataire {i}")
-        start_date = st.date_input(f"Date d'arrivée du Colocataire {i}")
-        end_date = st.date_input(f"Date de départ du Colocataire {i}")
-        coloc_details[name] = [start_date, end_date]
+        name = st.text_input(f"Nom du Colocataire {i}", value=coloc_details.get(f"coloc_{i}", {}).get("name", ""))
+        start_date = st.date_input(f"Date d'arrivée du Colocataire {i}", value=coloc_details.get(f"coloc_{i}", {}).get("start_date", datetime.today()))
+        end_date = st.date_input(f"Date de départ du Colocataire {i}", value=coloc_details.get(f"coloc_{i}", {}).get("end_date", datetime.today()))
+        coloc_details[f"coloc_{i}"] = {"name": name, "start_date": start_date, "end_date": end_date}
 
     if st.button("Valider Étape 2"):
         if coloc_details:
-            st.session_state.coloc_details = coloc_details
+            st.session_state.coloc_details = {d["name"]: [d["start_date"], d["end_date"]] for d in coloc_details.values()}
             st.session_state.current_step = 2
 
 elif current_step == "Qui a payé les factures?":
