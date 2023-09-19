@@ -1,51 +1,120 @@
-# Copyright (c) Streamlit Inc. (2018-2022) Snowflake Inc. (2022)
-#
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
-
 import streamlit as st
-from streamlit.logger import get_logger
+from datetime import datetime
 
-LOGGER = get_logger(__name__)
+# Function to calculate days between two dates
+def calculate_days(start_date, end_date):
+    delta = end_date - start_date
+    return delta.days
 
+# Function to calculate each roommate's share of the bills
+def calculate_share(bill_details, coloc_details):
+    shares = {}
+    for bill_type, bill_info in bill_details.items():
+        billing_amount = bill_info['amount']
+        billing_start_date = bill_info['start_date']
+        billing_end_date = bill_info['end_date']
+        total_days = 0
+        coloc_days = {}
 
-def run():
-    st.set_page_config(
-        page_title="Hello",
-        page_icon="👋",
-    )
+        for name, dates in coloc_details.items():
+            start_date = max(dates[0], billing_start_date)
+            end_date = min(dates[1], billing_end_date)
 
-    st.write("# Welcome to Streamlit! 👋")
+            days = calculate_days(start_date, end_date)
+            total_days += days
+            coloc_days[name] = days
 
-    st.sidebar.success("Select a demo above.")
+        bill_share = {}
+        for name, days in coloc_days.items():
+            share = (days / total_days) * billing_amount
+            bill_share[name] = round(share, 2)
 
-    st.markdown(
-        """
-        Streamlit is an open-source app framework built specifically for
-        Machine Learning and Data Science projects.
-        **👈 Select a demo from the sidebar** to see some examples
-        of what Streamlit can do!
-        ### Want to learn more?
-        - Check out [streamlit.io](https://streamlit.io)
-        - Jump into our [documentation](https://docs.streamlit.io)
-        - Ask a question in our [community
-          forums](https://discuss.streamlit.io)
-        ### See more complex demos
-        - Use a neural net to [analyze the Udacity Self-driving Car Image
-          Dataset](https://github.com/streamlit/demo-self-driving)
-        - Explore a [New York City rideshare dataset](https://github.com/streamlit/demo-uber-nyc-pickups)
-    """
-    )
+        shares[bill_type] = bill_share
+    return shares
 
+# Function to calculate how much each roommate owes to the others
+def calculate_owe(shares, payers):
+    owe_details = {}
 
-if __name__ == "__main__":
-    run()
+    for name in payers.values():
+        owe_details[name] = 0
+
+    for bill_type, payer in payers.items():
+        for name, amount in shares[bill_type].items():
+            if name not in owe_details:
+                owe_details[name] = 0
+            if name == payer:
+                owe_details[name] += amount
+            else:
+                owe_details[name] -= amount
+    return owe_details
+
+# Streamlit App
+st.title("Répartition de Facture entre Colocataires 💰🏠")
+
+# Navigation
+page = st.selectbox("Étape :", ["Montant des Factures", "Détails des Colocataires", "Qui a payé les factures?", "Résultats"])
+
+# Initialize variables
+bill_details = {}
+coloc_details = {}
+payers = {}
+
+if page == "Montant des Factures":
+    st.header("Étape 1: Montant des Factures 💵")
+    # Your code here for this step, e.g.
+    eau_amount = st.number_input("Montant de la Facture d'Eau 💧", min_value=0.0)
+    eau_start_date = st.date_input("Date de Début de Facturation Eau 🗓️", format="DD/MM/YYYY")
+    eau_end_date = st.date_input("Date de Fin de Facturation Eau 🗓️", format="DD/MM/YYYY")
+
+    edf_amount = st.number_input("Montant de la Facture EDF ⚡", min_value=0.0)
+    edf_start_date = st.date_input("Date de Début de Facturation EDF 🗓️", format="DD/MM/YYYY")
+    edf_end_date = st.date_input("Date de Fin de Facturation EDF 🗓️", format="DD/MM/YYYY")
+
+    if st.button("Valider Étape 1"):
+        bill_details = {
+            "Eau": {"amount": eau_amount, "start_date": eau_start_date, "end_date": eau_end_date},
+            "EDF": {"amount": edf_amount, "start_date": edf_start_date, "end_date": edf_end_date}
+        }
+
+elif page == "Détails des Colocataires":
+    st.header("Étape 2: Détails des Colocataires 👥")
+    coloc_count = st.number_input("Nombre de Colocataires 👫", min_value=1, value=4)
+    coloc_details = {}
+
+    for i in range(1, coloc_count + 1):
+        name = st.text_input(f"Nom du Colocataire {i}")
+        start_date = st.date_input(f"Date d'arrivée du Colocataire {i} 📆", format="DD/MM/YYYY")
+        end_date = st.date_input(f"Date de départ du Colocataire {i} 📆", format="DD/MM/YYYY")
+        coloc_details[name] = [start_date, end_date]
+
+    if st.button("Valider Étape 2"):
+        # Validate and store roommate details
+        # Allow the user to proceed to the next step
+
+        pass  # Replace with your validation and data storing logic
+
+elif page == "Qui a payé les factures?":
+    st.header("Étape 3: Qui a payé les factures? 💳")
+    eau_payer = st.selectbox("Payer de la Facture d'Eau 💧", list(coloc_details.keys()))
+    edf_payer = st.selectbox("Payer de la Facture EDF ⚡", list(coloc_details.keys()))
+
+    if st.button("Valider Étape 3"):
+        payers = {
+            "Eau": eau_payer,
+            "EDF": edf_payer
+        }
+
+        shares = calculate_share(bill_details, coloc_details)
+        owe_details = calculate_owe(shares, payers)
+
+elif page == "Résultats":
+    st.header("Étape 4: Résultats 📊")
+
+    shares = calculate_share(bill_details, coloc_details)
+    owe_details = calculate_owe(shares, payers)
+
+    st.subheader("Répartition des Factures")
+    st.write(shares)
+    st.subheader("Combien chacun doit à qui")
+    st.write(owe_details)
