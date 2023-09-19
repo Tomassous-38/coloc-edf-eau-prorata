@@ -1,6 +1,10 @@
 import streamlit as st
 from datetime import datetime
 
+# Initialize session state
+if 'current_step' not in st.session_state:
+    st.session_state.current_step = 0
+
 # Function to calculate days between two dates
 def calculate_days(start_date, end_date):
     delta = end_date - start_date
@@ -52,64 +56,73 @@ def calculate_owe(shares, payers):
 # Streamlit App
 st.title("Répartition de Facture entre Colocataires 💰🏠")
 
+# Steps
+steps = ["Montant des Factures", "Détails des Colocataires", "Qui a payé les factures?", "Résultats"]
+current_step = st.session_state.current_step
+
 # Navigation
-page = st.selectbox("Étape :", ["Montant des Factures", "Détails des Colocataires", "Qui a payé les factures?", "Résultats"])
+st.sidebar.title('Étapes')
+current_step = st.sidebar.radio("Choisir une étape", steps, index=current_step)
 
-# Initialize variables
-bill_details = {}
-coloc_details = {}
-payers = {}
-
-if page == "Montant des Factures":
+# Step 1: Bill Details
+if current_step == "Montant des Factures":
     st.header("Étape 1: Montant des Factures 💵")
-    # Your code here for this step, e.g.
     eau_amount = st.number_input("Montant de la Facture d'Eau 💧", min_value=0.0)
-    eau_start_date = st.date_input("Date de Début de Facturation Eau 🗓️", format="DD/MM/YYYY")
-    eau_end_date = st.date_input("Date de Fin de Facturation Eau 🗓️", format="DD/MM/YYYY")
+    eau_start_date = st.date_input("Date de Début de Facturation Eau 🗓️")
+    eau_end_date = st.date_input("Date de Fin de Facturation Eau 🗓️")
 
     edf_amount = st.number_input("Montant de la Facture EDF ⚡", min_value=0.0)
-    edf_start_date = st.date_input("Date de Début de Facturation EDF 🗓️", format="DD/MM/YYYY")
-    edf_end_date = st.date_input("Date de Fin de Facturation EDF 🗓️", format="DD/MM/YYYY")
+    edf_start_date = st.date_input("Date de Début de Facturation EDF 🗓️")
+    edf_end_date = st.date_input("Date de Fin de Facturation EDF 🗓️")
 
     if st.button("Valider Étape 1"):
-        bill_details = {
-            "Eau": {"amount": eau_amount, "start_date": eau_start_date, "end_date": eau_end_date},
-            "EDF": {"amount": edf_amount, "start_date": edf_start_date, "end_date": edf_end_date}
-        }
+        if eau_amount > 0 and edf_amount > 0:
+            st.session_state.bill_details = {
+                "Eau": {"amount": eau_amount, "start_date": eau_start_date, "end_date": eau_end_date},
+                "EDF": {"amount": edf_amount, "start_date": edf_start_date, "end_date": edf_end_date}
+            }
+            st.session_state.current_step = 1  # Move to next step
+        else:
+            st.error("Veuillez entrer des montants valides pour les factures.")
 
-elif page == "Détails des Colocataires":
+# Step 2: Roommate Details
+elif current_step == "Détails des Colocataires":
     st.header("Étape 2: Détails des Colocataires 👥")
     coloc_count = st.number_input("Nombre de Colocataires 👫", min_value=1, value=4)
     coloc_details = {}
 
     for i in range(1, coloc_count + 1):
         name = st.text_input(f"Nom du Colocataire {i}")
-        start_date = st.date_input(f"Date d'arrivée du Colocataire {i} 📆", format="DD/MM/YYYY")
-        end_date = st.date_input(f"Date de départ du Colocataire {i} 📆", format="DD/MM/YYYY")
+        start_date = st.date_input(f"Date d'arrivée du Colocataire {i} 📆")
+        end_date = st.date_input(f"Date de départ du Colocataire {i} 📆")
         coloc_details[name] = [start_date, end_date]
 
     if st.button("Valider Étape 2"):
-        # Validate and store roommate details
-        # Allow the user to proceed to the next step
+        if coloc_details:
+            st.session_state.coloc_details = coloc_details
+            st.session_state.current_step = 2  # Move to next step
+        else:
+            st.error("Veuillez entrer les détails des colocataires.")
 
-        pass  # Replace with your validation and data storing logic
-
-elif page == "Qui a payé les factures?":
+# Step 3: Who paid the bills
+elif current_step == "Qui a payé les factures?":
     st.header("Étape 3: Qui a payé les factures? 💳")
-    eau_payer = st.selectbox("Payer de la Facture d'Eau 💧", list(coloc_details.keys()))
-    edf_payer = st.selectbox("Payer de la Facture EDF ⚡", list(coloc_details.keys()))
+    eau_payer = st.selectbox("Payer de la Facture d'Eau 💧", list(st.session_state.coloc_details.keys()))
+    edf_payer = st.selectbox("Payer de la Facture EDF ⚡", list(st.session_state.coloc_details.keys()))
 
     if st.button("Valider Étape 3"):
-        payers = {
-            "Eau": eau_payer,
-            "EDF": edf_payer
-        }
+        if eau_payer and edf_payer:
+            st.session_state.payers = {"Eau": eau_payer, "EDF": edf_payer}
+            st.session_state.current_step = 3  # Move to next step
+        else:
+            st.error("Veuillez sélectionner qui a payé chaque facture.")
 
-        shares = calculate_share(bill_details, coloc_details)
-        owe_details = calculate_owe(shares, payers)
-
-elif page == "Résultats":
+# Step 4: Results
+elif current_step == "Résultats":
     st.header("Étape 4: Résultats 📊")
+    bill_details = st.session_state.bill_details
+    coloc_details = st.session_state.coloc_details
+    payers = st.session_state.payers
 
     shares = calculate_share(bill_details, coloc_details)
     owe_details = calculate_owe(shares, payers)
